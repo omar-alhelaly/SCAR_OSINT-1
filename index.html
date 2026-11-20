@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hidden OSINT — Cloud-Native Stealth Recon Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            cyber: {
+              darkest: '#040711',
+              bg: '#070D1B',
+              card: '#081024',
+              cardHover: '#0C162E',
+              border: '#16233F',
+              borderLight: '#213560',
+              neon: '#00FF85',
+              neonDark: '#05B864',
+              cyan: '#00F0FF',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          boxShadow: {
+            'glow-neon': '0 0 20px -3px rgba(0, 255, 133, 0.35)',
+            'glow-cyan': '0 0 20px -3px rgba(0, 240, 255, 0.30)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      background-color: #050811;
+      color: #e2e8f0;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .bg-grid-pattern {
+      background-size: 32px 32px;
+      background-image:
+        linear-gradient(to right, rgba(26, 39, 68, 0.25) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(26, 39, 68, 0.25) 1px, transparent 1px);
+    }
+    .bg-radial-glow {
+      background: radial-gradient(circle at 50% 0%, rgba(0, 255, 133, 0.08) 0%, transparent 55%);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070d1b; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .nav-active {
+      background: rgba(0, 255, 133, 0.1);
+      border-color: rgba(0, 255, 133, 0.35);
+      color: #00FF85;
+      box-shadow: 0 0 15px -3px rgba(0, 255, 133, 0.2);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-grid-pattern bg-radial-glow min-h-screen flex flex-col md:flex-row">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+  <!-- Sidebar Navigation -->
+  <aside class="w-full md:w-64 bg-[#070D1B]/95 border-b md:border-b-0 md:border-r border-[#16233F] flex flex-col shrink-0 backdrop-blur-md">
+    <div class="p-5 border-b border-[#16233F] flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-glow-neon shrink-0">
+        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-mono font-extrabold text-base tracking-tight text-slate-100">
+          Hidden <span class="text-emerald-400">OSINT</span>
+        </div>
+        <div class="font-mono text-[10px] text-slate-400 uppercase tracking-wider">Unified Recon v2.5</div>
+      </div>
+    </div>
+
+    <nav class="p-3 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible flex-1 font-mono text-xs">
+      <button onclick="switchTab('scan')" id="nav-scan" class="nav-btn nav-active flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-transparent text-slate-300 hover:bg-[#0C162E] transition-all whitespace-nowrap">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12 19 5"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Stealth Recon</span>
+      </button>
+
+      <button onclick="switchTab('assets')" id="nav-assets" class="nav-btn flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl border border-transparent text-slate-400 hover:bg-[#0C162E] hover:text-slate-200 transition-all whitespace-nowrap">
+        <span class="flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Discovered Assets</span>
+        </span>
+        <span id="badge-assets-count" class="px-1.5 py-0.5 text-[10px] rounded bg-[#0E1A35] text-cyan-400 border border-[#1E2E52]">0</span>
+      </button>
+
+      <button onclick="switchTab('ai')" id="nav-ai" class="nav-btn flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-transparent text-slate-400 hover:bg-[#0C162E] hover:text-slate-200 transition-all whitespace-nowrap">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2v4a4 4 0 0 0 8 0v-4h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/></svg>
+        <span>AI Threat Intel</span>
+      </button>
+
+      <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl border border-transparent text-slate-400 hover:bg-[#0C162E] hover:text-slate-200 transition-all whitespace-nowrap">
+        <span class="flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Scan History</span>
+        </span>
+        <span id="badge-history-count" class="px-1.5 py-0.5 text-[10px] rounded bg-[#0E1A35] text-slate-400 border border-[#1E2E52]">0</span>
+      </button>
+    </nav>
+
+    <!-- System Health Footer -->
+    <div class="hidden md:block p-4 border-t border-[#16233F] font-mono text-[11px] space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-slate-500">Engine</span>
+        <span class="text-emerald-400 flex items-center gap-1.5 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> FastAPI Live
+        </span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-slate-500">AI Core</span>
+        <span class="text-cyan-400 font-semibold">Llama 3.1 (Ollama)</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-slate-500">Mode</span>
+        <span class="text-slate-300">Zero-Packet Passive</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- ==================== TAB 1: STEALTH RECON ==================== -->
+    <section id="tab-scan" class="tab-section space-y-6 animate-fade-in">
+      <!-- Hero Banner -->
+      <div class="relative p-6 rounded-2xl bg-gradient-to-r from-[#071129] via-[#0B1533] to-[#081226] border border-[#1A2A4E] shadow-2xl overflow-hidden">
+        <div class="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>PASSIVE INTELLIGENCE ENGINE READY</span>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400 bg-[#050B17]/80 px-2.5 py-1 rounded-lg border border-[#1A2A4E]">
+              15 Sources • No Active Probing
+            </span>
+          </div>
+
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold font-mono text-slate-100 tracking-tight">
+              Stealth Subdomain <span class="text-emerald-400">Reconnaissance</span>
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">
+              Enumerate subdomains passively across Certificate Transparency logs, Web Archives, Shodan, VirusTotal, SecurityTrails, GitHub & Censys with DNS verification.
+            </p>
+          </div>
+
+          <!-- Scan Form -->
+          <form id="scan-form" class="space-y-3 pt-1">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input
+                id="domain-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Enter target domain (e.g. tesla.com, hackerone.com, example.com)"
+                class="flex-1 bg-[#050B17] border border-[#213560] focus:border-emerald-400 rounded-xl px-4 py-3.5 text-sm font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 transition-all"
+              />
+              <button
+                id="scan-btn"
+                type="submit"
+                class="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-sm shadow-glow-neon transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 shrink-0"
+              >
+                <svg id="scan-btn-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12 18 6"/></svg>
+                <span id="scan-btn-text">Start Stealth Scan</span>
+              </button>
+            </div>
+
+            <!-- Options & Quick Targets -->
+            <div class="flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-slate-500">Quick Targets:</span>
+                <button type="button" onclick="setTarget('example.com')" class="px-2.5 py-1 rounded-md bg-[#0B152B] hover:bg-emerald-500/10 hover:text-emerald-400 border border-[#1A2A4E] text-slate-400 transition-colors">example.com</button>
+                <button type="button" onclick="setTarget('hackerone.com')" class="px-2.5 py-1 rounded-md bg-[#0B152B] hover:bg-emerald-500/10 hover:text-emerald-400 border border-[#1A2A4E] text-slate-400 transition-colors">hackerone.com</button>
+                <button type="button" onclick="setTarget('tesla.com')" class="px-2.5 py-1 rounded-md bg-[#0B152B] hover:bg-emerald-500/10 hover:text-emerald-400 border border-[#1A2A4E] text-slate-400 transition-colors">tesla.com</button>
+                <button type="button" onclick="setTarget('github.com')" class="px-2.5 py-1 rounded-md bg-[#0B152B] hover:bg-emerald-500/10 hover:text-emerald-400 border border-[#1A2A4E] text-slate-400 transition-colors">github.com</button>
+              </div>
+
+              <label class="inline-flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-200 select-none">
+                <input id="proxy-toggle" type="checkbox" class="rounded bg-[#050B17] border-[#213560] accent-emerald-500 w-3.5 h-3.5" />
+                <span>Use Free Proxy Rotation (Slower)</span>
+              </label>
+            </div>
+
+            <!-- Validation / Status Alert Banner -->
+            <div id="scan-alert" class="hidden p-3.5 rounded-xl font-mono text-xs border"></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 4 Top KPI Stat Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
+        <div class="p-4 rounded-xl bg-[#081024] border border-[#16233F]">
+          <span class="text-[11px] text-slate-400 uppercase">Target Domain</span>
+          <div id="kpi-target" class="text-lg font-bold text-slate-100 mt-1 truncate">—</div>
+          <span id="kpi-dns" class="text-[11px] text-slate-500 mt-1 block">Awaiting scan</span>
+        </div>
+
+        <div class="p-4 rounded-xl bg-[#081024] border border-cyan-500/20">
+          <span class="text-[11px] text-cyan-400 uppercase">Subdomains Found</span>
+          <div id="kpi-total" class="text-2xl font-bold text-cyan-400 mt-1">0</div>
+          <span class="text-[11px] text-slate-500 mt-1 block">Deduplicated & verified</span>
+        </div>
+
+        <div class="p-4 rounded-xl bg-[#081024] border border-rose-500/20">
+          <span class="text-[11px] text-rose-400 uppercase">Critical & High Risk</span>
+          <div id="kpi-highrisk" class="text-2xl font-bold text-rose-400 mt-1">0</div>
+          <span class="text-[11px] text-slate-500 mt-1 block">Admin / Dev / API / VPN</span>
+        </div>
+
+        <div class="p-4 rounded-xl bg-[#081024] border border-emerald-500/20">
+          <span class="text-[11px] text-emerald-400 uppercase">Active Sources</span>
+          <div id="kpi-sources" class="text-2xl font-bold text-emerald-400 mt-1">0 / 15</div>
+          <span class="text-[11px] text-slate-500 mt-1 block">Free + API Key feeds</span>
+        </div>
+      </div>
+
+      <!-- Live Terminal Console + Sources Status Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Terminal -->
+        <div class="lg:col-span-5 rounded-xl bg-[#040813] border border-[#16233F] flex flex-col overflow-hidden">
+          <div class="px-4 py-2.5 bg-[#070D1B] border-b border-[#16233F] flex items-center justify-between font-mono text-[11px]">
+            <span class="text-emerald-400 font-bold flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              ENGINE CONSOLE
+            </span>
+            <button onclick="clearLogs()" class="text-slate-500 hover:text-slate-300">Clear</button>
+          </div>
+          <div id="terminal-logs" class="p-3.5 font-mono text-xs text-slate-300 h-64 overflow-y-auto space-y-1.5">
+            <div class="text-slate-500">[SYSTEM] Hidden OSINT Unified Engine initialized.</div>
+            <div class="text-slate-500">[SYSTEM] Ready to accept target domain...</div>
+          </div>
+        </div>
+
+        <!-- Sources Status Grid -->
+        <div class="lg:col-span-7 rounded-xl bg-[#081024] border border-[#16233F] p-4 flex flex-col">
+          <div class="flex items-center justify-between border-b border-[#14203A] pb-3 mb-3">
+            <h2 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-200">
+              Intelligence Sources Status
+            </h2>
+            <span class="text-[11px] font-mono text-slate-500">Configure API keys in .env</span>
+          </div>
+          <div id="sources-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 font-mono text-xs overflow-y-auto max-h-60 pr-1">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Bar after Scan -->
+      <div id="post-scan-bar" class="hidden p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+        <div id="post-scan-summary" class="text-emerald-300 font-semibold"></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="switchTab('assets')" class="px-3.5 py-2 rounded-lg bg-[#0E1A35] hover:bg-[#15254A] border border-[#213560] text-slate-200 transition-colors">
+            Inspect Assets Table →
+          </button>
+          <button onclick="runAIAnalysisFromCurrent()" class="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-colors shadow-glow-neon">
+            Analyze with Llama 3.1
+          </button>
+          <button onclick="exportCSV()" class="px-3.5 py-2 rounded-lg bg-[#0E1A35] hover:bg-[#15254A] border border-[#213560] text-cyan-400 transition-colors">
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: DISCOVERED ASSETS ==================== -->
+    <section id="tab-assets" class="tab-section hidden space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#16233F] pb-4">
+        <div>
+          <span class="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">ASSET INVENTORY</span>
+          <h2 class="text-2xl font-extrabold font-mono text-slate-100 mt-1">Discovered Perimeter Assets</h2>
+        </div>
+        <div class="flex items-center gap-2 font-mono text-xs">
+          <button onclick="exportCSV()" class="px-3.5 py-2 rounded-xl bg-[#0E1B38] hover:bg-[#15274F] text-emerald-400 border border-[#213560] transition-all">
+            Export CSV
+          </button>
+          <button onclick="exportJSON()" class="px-3.5 py-2 rounded-xl bg-[#0E1B38] hover:bg-[#15274F] text-cyan-400 border border-[#213560] transition-all">
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="p-4 rounded-xl bg-[#081024] border border-[#16233F] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+        <input id="filter-search" oninput="renderAssetsTable()" type="text" placeholder="Search subdomain..." class="bg-[#050B17] border border-[#1E2E52] rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-400" />
+
+        <select id="filter-risk" onchange="renderAssetsTable()" class="bg-[#050B17] border border-[#1E2E52] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-400">
+          <option value="all">All Risk Levels</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+
+        <select id="filter-class" onchange="renderAssetsTable()" class="bg-[#050B17] border border-[#1E2E52] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-400">
+          <option value="all">All Classifications</option>
+          <option value="Admin Portal">Admin Portal</option>
+          <option value="Dev / Staging">Dev / Staging</option>
+          <option value="API">API</option>
+          <option value="Infrastructure">Infrastructure</option>
+          <option value="General">General</option>
+        </select>
+
+        <select id="filter-source" onchange="renderAssetsTable()" class="bg-[#050B17] border border-[#1E2E52] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-400">
+          <option value="all">All Sources</option>
+        </select>
+      </div>
+
+      <!-- Table -->
+      <div class="rounded-xl bg-[#081024] border border-[#16233F] overflow-hidden">
+        <div class="overflow-x-auto max-h-[560px]">
+          <table class="w-full text-left font-mono text-xs">
+            <thead class="bg-[#050B17] text-slate-400 border-b border-[#14203A] sticky top-0 z-10">
+              <tr>
+                <th class="py-3 px-4">#</th>
+                <th class="py-3 px-4">Subdomain</th>
+                <th class="py-3 px-4">Classification</th>
+                <th class="py-3 px-4">Risk Level</th>
+                <th class="py-3 px-4">Sources</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="assets-tbody" class="divide-y divide-[#13203C]">
+              <tr>
+                <td colspan="6" class="py-12 text-center text-slate-500">
+                  No assets yet. Run a Stealth Scan first.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: AI THREAT INTEL ==================== -->
+    <section id="tab-ai" class="tab-section hidden space-y-6 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#16233F] pb-4">
+        <div>
+          <span class="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">LLAMA 3.1 REASONING ENGINE</span>
+          <h2 class="text-2xl font-extrabold font-mono text-slate-100 mt-1">AI Threat Surface Analysis</h2>
+          <p class="text-xs text-slate-400 mt-1">Prioritize discovered subdomains using local Ollama (Llama 3.1) or built-in heuristic engine.</p>
+        </div>
+        <button id="ai-run-btn" onclick="triggerAIAnalysis()" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs shadow-glow-neon transition-all disabled:opacity-50 shrink-0">
+          Run AI Analysis
+        </button>
+      </div>
+
+      <!-- AI Risk Breakdown Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
+        <div class="p-4 rounded-xl bg-[#081024] border border-rose-500/25">
+          <span class="text-[11px] text-rose-400 uppercase">Critical Risk</span>
+          <div id="ai-stat-critical" class="text-2xl font-bold text-rose-400 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-[#081024] border border-orange-500/25">
+          <span class="text-[11px] text-orange-400 uppercase">High Risk</span>
+          <div id="ai-stat-high" class="text-2xl font-bold text-orange-400 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-[#081024] border border-amber-500/25">
+          <span class="text-[11px] text-amber-400 uppercase">Medium Risk</span>
+          <div id="ai-stat-medium" class="text-2xl font-bold text-amber-400 mt-1">0</div>
+        </div>
+        <div class="p-4 rounded-xl bg-[#081024] border border-cyan-500/25">
+          <span class="text-[11px] text-cyan-400 uppercase">Low / General</span>
+          <div id="ai-stat-low" class="text-2xl font-bold text-cyan-400 mt-1">0</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Input Subdomains Box -->
+        <div class="lg:col-span-5 p-4 rounded-xl bg-[#081024] border border-[#16233F] flex flex-col gap-3">
+          <div class="flex items-center justify-between font-mono text-xs">
+            <span class="text-slate-300 font-bold">Target Subdomains Input</span>
+            <button onclick="loadCurrentIntoAI()" class="text-cyan-400 hover:text-cyan-300">Load Latest Scan</button>
+          </div>
+          <textarea id="ai-input" rows="12" placeholder="Subdomains will load here automatically after a scan, or paste custom subdomains (one per line)..." class="w-full bg-[#050B17] border border-[#1E2E52] rounded-lg p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-400 resize-none"></textarea>
+        </div>
+
+        <!-- AI Report Output -->
+        <div class="lg:col-span-7 p-5 rounded-xl bg-[#040813] border border-emerald-500/30 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-[#14203A] pb-2.5 font-mono text-xs">
+            <span class="text-emerald-400 font-bold">🛡️ LLAMA 3.1 SECURITY REPORT</span>
+            <span id="ai-status-badge" class="text-slate-500">Idle</span>
+          </div>
+          <pre id="ai-output" dir="auto" class="whitespace-pre-wrap font-mono text-xs sm:text-sm text-slate-200 leading-relaxed overflow-y-auto max-h-[380px]">Click "Run AI Analysis" to classify discovered subdomains and identify top Red Team targets.</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: SCAN HISTORY ==================== -->
+    <section id="tab-history" class="tab-section hidden space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between border-b border-[#16233F] pb-4">
+        <div>
+          <span class="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">LOCAL AUDIT LOG</span>
+          <h2 class="text-2xl font-extrabold font-mono text-slate-100 mt-1">Reconnaissance Scan History</h2>
+        </div>
+        <button onclick="clearHistory()" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-mono text-xs transition-colors">
+          Clear History
+        </button>
+      </div>
+
+      <div class="rounded-xl bg-[#081024] border border-[#16233F] overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left font-mono text-xs">
+            <thead class="bg-[#050B17] text-slate-400 border-b border-[#14203A]">
+              <tr>
+                <th class="py-3 px-4">Target Domain</th>
+                <th class="py-3 px-4">Date</th>
+                <th class="py-3 px-4">DNS</th>
+                <th class="py-3 px-4">Subdomains</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody" class="divide-y divide-[#13203C]"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ---------- State ----------
+    const DEFAULT_SOURCES = [
+  'crt.sh', 'WaybackMachine', 'HackerTarget', 'AlienVault OTX',
+  'AnubisDB', 'URLScan.io', 'RapidDNS', 'SubdomainCenter',
+  'CertSpotter', 'ThreatMiner', 'VirusTotal', 'SecurityTrails',
+  'Shodan', 'GitHub', 'Censys'
+];
+    let currentScan = null;
+    let classifiedAssets = [];
+    let scanHistory = JSON.parse(localStorage.getItem('hidden_osint_history_v1') || '[]');
+
+    // ---------- Security & Validation Helpers ----------
+    const DOMAIN_RE = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+    function sanitizeDomainInput(raw) {
+      return String(raw || '')
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '')
+        .replace(/:\d+$/, '')
+        .replace(/\.$/, '');
+    }
+
+    // CSV Formula Injection Prevention
+    function safeCsvCell(val) {
+      let s = String(val ?? '').replace(/"/g, '""');
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return `"${s}"`;
+    }
+
+    function classifySubdomain(sub) {
+      const s = sub.toLowerCase();
+      if (/(admin|portal|dash|auth|login|sso|internal|vpn|cpanel|root|k8s|vault)/.test(s)) {
+        return { classification: 'Admin Portal', risk: 'Critical' };
+      }
+      if (/(dev|stag|test|uat|beta|sandbox|qa|preprod|demo)/.test(s)) {
+        return { classification: 'Dev / Staging', risk: 'High' };
+      }
+      if (/(api|graphql|rest|gw|gateway|ws|webhook|rpc)/.test(s)) {
+        return { classification: 'API', risk: 'High' };
+      }
+      if (/(mail|smtp|imap|cdn|cloud|git|jenkins|jira|db|sql|redis|ns\d|ftp|s3)/.test(s)) {
+        return { classification: 'Infrastructure', risk: 'Medium' };
+      }
+      return { classification: 'General', risk: 'Low' };
+    }
+
+    // ---------- UI Helpers (XSS-Safe via textContent) ----------
+    function showToast(type, title, msg) {
+      const container = document.getElementById('toast-container');
+      const card = document.createElement('div');
+      const colors = {
+        success: 'border-emerald-500/40 bg-[#071915] text-emerald-300',
+        error: 'border-rose-500/40 bg-[#1B0910] text-rose-300',
+        warning: 'border-amber-500/40 bg-[#1B1407] text-amber-300',
+        info: 'border-cyan-500/40 bg-[#071521] text-cyan-300'
+      };
+      card.className = `p-3.5 rounded-xl border shadow-xl font-mono text-xs animate-fade-in ${colors[type] || colors.info}`;
+      const t = document.createElement('div');
+      t.className = 'font-bold';
+      t.textContent = title;
+      const m = document.createElement('div');
+      m.className = 'text-slate-300 mt-0.5 text-[11px]';
+      m.textContent = msg;
+      card.append(t, m);
+      container.appendChild(card);
+      setTimeout(() => card.remove(), 4000);
+    }
+
+    function addLog(msg, colorClass = 'text-slate-300') {
+      const box = document.getElementById('terminal-logs');
+      const line = document.createElement('div');
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      line.className = colorClass;
+      line.textContent = `[${time}] ${msg}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() {
+      const box = document.getElementById('terminal-logs');
+      box.textContent = '';
+      addLog('Console cleared.', 'text-slate-500');
+    }
+
+    function showAlert(type, message) {
+      const el = document.getElementById('scan-alert');
+      const styles = {
+        error: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
+        warning: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+        success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+      };
+      el.className = `p-3.5 rounded-xl font-mono text-xs border ${styles[type] || styles.warning}`;
+      el.textContent = message;
+      el.classList.remove('hidden');
+    }
+
+    function hideAlert() {
+      document.getElementById('scan-alert').classList.add('hidden');
+    }
+
+    function setTarget(domain) {
+      document.getElementById('domain-input').value = domain;
+      hideAlert();
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.remove('nav-active');
+        b.classList.add('text-slate-400');
+      });
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`nav-${tabName}`);
+      activeBtn.classList.add('nav-active');
+      activeBtn.classList.remove('text-slate-400');
+    }
+
+    // ---------- Render Sources Grid ----------
+    function renderSourcesGrid(sourcesList) {
+      const grid = document.getElementById('sources-grid');
+      grid.textContent = '';
+
+      const items = sourcesList && sourcesList.length
+        ? sourcesList
+        : DEFAULT_SOURCES.map(name => ({ source: name, status: 'idle', found: 0, error: null }));
+
+      items.forEach(src => {
+        const card = document.createElement('div');
+        card.className = 'p-2.5 rounded-lg bg-[#050B17] border border-[#14203A] flex flex-col justify-between gap-1.5';
+
+        const top = document.createElement('div');
+        top.className = 'flex items-center justify-between gap-2';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'font-bold text-slate-200 truncate';
+        nameEl.textContent = src.source;
+
+        const badge = document.createElement('span');
+        const statusMap = {
+          done: { text: `${src.found} FOUND`, cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+          running: { text: 'SCANNING', cls: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30 animate-pulse' },
+          skipped: { text: 'NO KEY', cls: 'bg-slate-800 text-slate-400 border-slate-700' },
+          failed: { text: 'FAILED', cls: 'bg-rose-500/10 text-rose-400 border-rose-500/30' },
+          idle: { text: 'READY', cls: 'bg-slate-800/60 text-slate-400 border-slate-700/60' }
+        };
+        const st = statusMap[src.status] || statusMap.idle;
+        badge.className = `px-1.5 py-0.5 rounded text-[10px] border shrink-0 ${st.cls}`;
+        badge.textContent = st.text;
+
+        top.append(nameEl, badge);
+        card.appendChild(top);
+
+        if (src.error) {
+          const errEl = document.createElement('div');
+          errEl.className = 'text-[10px] text-slate-500 truncate';
+          errEl.title = src.error;
+          errEl.textContent = src.error;
+          card.appendChild(errEl);
+        }
+        grid.appendChild(card);
+      });
+    }
+
+    // ---------- Load Scan Data into UI ----------
+    function applyScanResult(data) {
+      currentScan = data;
+      const detailed = data.detailed_subdomains || (data.subdomains || []).map(s => ({ subdomain: s, sources: ['OSINT'] }));
+      classifiedAssets = detailed.map(item => {
+        const meta = classifySubdomain(item.subdomain);
+        return {
+          subdomain: item.subdomain,
+          sources: item.sources || [],
+          classification: meta.classification,
+          risk: meta.risk
+        };
+      });
+
+      // KPIs
+      document.getElementById('kpi-target').textContent = data.target || '—';
+      const dnsEl = document.getElementById('kpi-dns');
+      dnsEl.textContent = data.dns_exists ? 'DNS Record Verified' : 'No DNS A/AAAA Record';
+      dnsEl.className = `text-[11px] mt-1 block ${data.dns_exists ? 'text-emerald-400' : 'text-amber-400'}`;
+
+      document.getElementById('kpi-total').textContent = String(classifiedAssets.length);
+      const highRiskCount = classifiedAssets.filter(a => a.risk === 'Critical' || a.risk === 'High').length;
+      document.getElementById('kpi-highrisk').textContent = String(highRiskCount);
+
+      const doneSources = (data.sources || []).filter(s => s.status === 'done').length;
+      const totalSources = (data.sources || []).length || DEFAULT_SOURCES.length;
+      document.getElementById('kpi-sources').textContent = `${doneSources} / ${totalSources}`;
+      document.getElementById('badge-assets-count').textContent = String(classifiedAssets.length);
+
+      // AI Stats
+      document.getElementById('ai-stat-critical').textContent = String(classifiedAssets.filter(a => a.risk === 'Critical').length);
+      document.getElementById('ai-stat-high').textContent = String(classifiedAssets.filter(a => a.risk === 'High').length);
+      document.getElementById('ai-stat-medium').textContent = String(classifiedAssets.filter(a => a.risk === 'Medium').length);
+      document.getElementById('ai-stat-low').textContent = String(classifiedAssets.filter(a => a.risk === 'Low').length);
+
+      // Populate Source Filter dropdown
+      const srcSelect = document.getElementById('filter-source');
+      srcSelect.textContent = '';
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.textContent = 'All Sources';
+      srcSelect.appendChild(allOpt);
+      const uniqueSrcs = new Set();
+      classifiedAssets.forEach(a => a.sources.forEach(s => uniqueSrcs.add(s)));
+      [...uniqueSrcs].sort().forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        srcSelect.appendChild(opt);
+      });
+
+      renderSourcesGrid(data.sources);
+      renderAssetsTable();
+      loadCurrentIntoAI();
+
+      const postBar = document.getElementById('post-scan-bar');
+      if (classifiedAssets.length > 0) {
+        document.getElementById('post-scan-summary').textContent =
+          `Scan complete for ${data.target}: ${classifiedAssets.length} unique subdomains discovered (${highRiskCount} Critical/High priority).`;
+        postBar.classList.remove('hidden');
+      } else {
+        postBar.classList.add('hidden');
+      }
+    }
+
+    // ---------- Render Assets Table ----------
+    function renderAssetsTable() {
+      const tbody = document.getElementById('assets-tbody');
+      tbody.textContent = '';
+
+      const q = document.getElementById('filter-search').value.trim().toLowerCase();
+      const riskF = document.getElementById('filter-risk').value;
+      const classF = document.getElementById('filter-class').value;
+      const srcF = document.getElementById('filter-source').value;
+
+      const filtered = classifiedAssets.filter(a => {
+        if (q && !a.subdomain.toLowerCase().includes(q)) return false;
+        if (riskF !== 'all' && a.risk !== riskF) return false;
+        if (classF !== 'all' && a.classification !== classF) return false;
+        if (srcF !== 'all' && !a.sources.includes(srcF)) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6;
+        td.className = 'py-12 text-center text-slate-500';
+        td.textContent = classifiedAssets.length === 0
+          ? 'No discovered subdomains yet. Run a Stealth Scan.'
+          : 'No subdomains match your current filter criteria.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      const riskColors = {
+        Critical: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+        High: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+        Medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+        Low: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+      };
+
+      filtered.forEach((asset, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#0C162E] transition-colors';
+
+        // #
+        const tdIdx = document.createElement('td');
+        tdIdx.className = 'py-3 px-4 text-slate-500';
+        tdIdx.textContent = String(idx + 1);
+
+        // Subdomain
+        const tdSub = document.createElement('td');
+        tdSub.className = 'py-3 px-4 font-bold text-slate-100';
+        tdSub.textContent = asset.subdomain;
+
+        // Classification
+        const tdCls = document.createElement('td');
+        tdCls.className = 'py-3 px-4';
+        const clsSpan = document.createElement('span');
+        clsSpan.className = 'px-2 py-0.5 rounded bg-[#0E1A35] border border-[#1E2E52] text-slate-300 text-[11px]';
+        clsSpan.textContent = asset.classification;
+        tdCls.appendChild(clsSpan);
+
+        // Risk
+        const tdRisk = document.createElement('td');
+        tdRisk.className = 'py-3 px-4';
+        const rSpan = document.createElement('span');
+        rSpan.className = `px-2 py-0.5 rounded border text-[11px] font-bold ${riskColors[asset.risk] || riskColors.Low}`;
+        rSpan.textContent = asset.risk;
+        tdRisk.appendChild(rSpan);
+
+        // Sources
+        const tdSrc = document.createElement('td');
+        tdSrc.className = 'py-3 px-4 flex flex-wrap gap-1';
+        asset.sources.forEach(src => {
+          const sBadge = document.createElement('span');
+          sBadge.className = 'px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px]';
+          sBadge.textContent = src;
+          tdSrc.appendChild(sBadge);
+        });
+
+        // Actions
+        const tdAct = document.createElement('td');
+        tdAct.className = 'py-3 px-4 text-right whitespace-nowrap space-x-2';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'px-2 py-1 rounded bg-[#0E1A35] hover:bg-[#16274F] text-slate-300 border border-[#1E2E52] text-[11px]';
+        copyBtn.textContent = 'Copy';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(asset.subdomain);
+          showToast('info', 'Copied', asset.subdomain);
+        };
+
+        const openLink = document.createElement('a');
+        openLink.href = `https://${encodeURIComponent(asset.subdomain)}`;
+        openLink.target = '_blank';
+        openLink.rel = 'noopener noreferrer';
+        openLink.className = 'inline-block px-2 py-1 rounded bg-[#0E1A35] hover:bg-[#16274F] text-cyan-400 border border-[#1E2E52] text-[11px]';
+        openLink.textContent = 'Open ↗';
+
+        tdAct.append(copyBtn, openLink);
+        tr.append(tdIdx, tdSub, tdCls, tdRisk, tdSrc, tdAct);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ---------- Execute Scan ----------
+    document.getElementById('scan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideAlert();
+
+      const raw = document.getElementById('domain-input').value;
+      const domain = sanitizeDomainInput(raw);
+      const useProxies = document.getElementById('proxy-toggle').checked;
+
+      if (!domain || !DOMAIN_RE.test(domain)) {
+        showAlert('error', 'صيغة الدومين غير صحيحة. أدخل دومين حقيقي مثل example.com أو tesla.com');
+        showToast('error', 'Invalid Domain', 'Please enter a valid root domain.');
+        return;
+      }
+
+      const btn = document.getElementById('scan-btn');
+      const btnText = document.getElementById('scan-btn-text');
+      btn.disabled = true;
+      btnText.textContent = 'Enumerating...';
+
+      renderSourcesGrid(DEFAULT_SOURCES.map(name => ({ source: name, status: 'running', found: 0, error: null })));
+      addLog(`Initiating passive stealth scan for: ${domain}`, 'text-emerald-400');
+      if (useProxies) addLog('Proxy rotation enabled — fetching & validating proxy pool...', 'text-amber-400');
+
+      try {
+        const res = await fetch('/api/v1/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_domain: domain, use_proxies: useProxies })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || `Server error (${res.status})`);
+        }
+
+        applyScanResult(data);
+
+        if (data.status === 'not_found') {
+          showAlert('error', data.message);
+          addLog(`[WARN] ${data.message}`, 'text-rose-400');
+          showToast('warning', 'Domain Not Found', data.message);
+        } else if (data.status === 'empty') {
+          showAlert('warning', data.message);
+          addLog(`[INFO] ${data.message}`, 'text-amber-400');
+          showToast('info', 'No Subdomains Found', data.message);
+        } else {
+          showAlert('success', data.message);
+          addLog(`[SUCCESS] ${data.total_found} unique subdomains enumerated for ${data.target}.`, 'text-emerald-400');
+          showToast('success', 'Scan Complete', `Found ${data.total_found} subdomains for ${data.target}`);
+        }
+
+        // Save to local history
+        saveToHistory(data);
+
+      } catch (err) {
+        const errMsg = err.message || 'Failed to connect to backend API.';
+        showAlert('error', errMsg);
+        addLog(`[ERROR] ${errMsg}`, 'text-rose-400');
+        showToast('error', 'Scan Failed', errMsg);
+        renderSourcesGrid([]);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Start Stealth Scan';
+      }
+    });
+
+    // ---------- AI Threat Analysis ----------
+    function loadCurrentIntoAI() {
+      if (currentScan && currentScan.subdomains && currentScan.subdomains.length > 0) {
+        document.getElementById('ai-input').value = currentScan.subdomains.join('\n');
+      }
+    }
+
+    function runAIAnalysisFromCurrent() {
+      loadCurrentIntoAI();
+      switchTab('ai');
+      triggerAIAnalysis();
+    }
+
+    async function triggerAIAnalysis() {
+      const rawData = document.getElementById('ai-input').value.trim();
+      if (!rawData) {
+        showToast('warning', 'No Data', 'Run a scan or paste subdomains first.');
+        return;
+      }
+
+      const btn = document.getElementById('ai-run-btn');
+      const statusBadge = document.getElementById('ai-status-badge');
+      const output = document.getElementById('ai-output');
+
+      btn.disabled = true;
+      btn.textContent = 'Analyzing...';
+      statusBadge.textContent = 'Running Llama 3.1...';
+      statusBadge.className = 'text-cyan-400 animate-pulse';
+      output.textContent = 'Sending discovered subdomains to Llama 3.1 Red Team Analyzer... Please wait.';
+
+      try {
+        const res = await fetch('/api/v1/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw_data: rawData })
+        });
+        const data = await res.json();
+        output.textContent = data.analysis || 'No analysis returned.';
+        statusBadge.textContent = 'Completed';
+        statusBadge.className = 'text-emerald-400 font-bold';
+        showToast('success', 'AI Analysis Ready', 'Threat prioritization report generated.');
+      } catch (err) {
+        output.textContent = `Error communicating with AI endpoint: ${err.message}`;
+        statusBadge.textContent = 'Error';
+        statusBadge.className = 'text-rose-400';
+        showToast('error', 'AI Error', 'Could not reach /api/v1/analyze');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run AI Analysis';
+      }
+    }
+
+    // ---------- History (LocalStorage) ----------
+    function saveToHistory(data) {
+      const entry = {
+        id: Date.now(),
+        timestamp: new Date().toLocaleString(),
+        data
+      };
+      scanHistory = [entry, ...scanHistory].slice(0, 20);
+      localStorage.setItem('hidden_osint_history_v1', JSON.stringify(scanHistory));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      document.getElementById('badge-history-count').textContent = String(scanHistory.length);
+      const tbody = document.getElementById('history-tbody');
+      tbody.textContent = '';
+
+      if (scanHistory.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6;
+        td.className = 'py-10 text-center text-slate-500';
+        td.textContent = 'No scan history recorded yet.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      scanHistory.forEach(item => {
+        const d = item.data;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#0C162E] transition-colors';
+
+        const tdTarget = document.createElement('td');
+        tdTarget.className = 'py-3 px-4 font-bold text-slate-100';
+        tdTarget.textContent = d.target;
+
+        const tdDate = document.createElement('td');
+        tdDate.className = 'py-3 px-4 text-slate-400';
+        tdDate.textContent = item.timestamp;
+
+        const tdDns = document.createElement('td');
+        tdDns.className = `py-3 px-4 ${d.dns_exists ? 'text-emerald-400' : 'text-amber-400'}`;
+        tdDns.textContent = d.dns_exists ? 'Valid' : 'No DNS';
+
+        const tdCount = document.createElement('td');
+        tdCount.className = 'py-3 px-4 font-bold text-cyan-400';
+        tdCount.textContent = String(d.total_found || 0);
+
+        const tdStatus = document.createElement('td');
+        tdStatus.className = 'py-3 px-4 uppercase text-[11px]';
+        tdStatus.textContent = d.status || 'done';
+
+        const tdAct = document.createElement('td');
+        tdAct.className = 'py-3 px-4 text-right space-x-2';
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'px-2.5 py-1 rounded bg-[#0E1A35] hover:bg-[#16274F] text-emerald-400 border border-[#1E2E52]';
+        loadBtn.textContent = 'Load';
+        loadBtn.onclick = () => {
+          applyScanResult(d);
+          switchTab('assets');
+          showToast('info', 'Loaded Scan', `Viewing results for ${d.target}`);
+        };
+        tdAct.appendChild(loadBtn);
+
+        tr.append(tdTarget, tdDate, tdDns, tdCount, tdStatus, tdAct);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function clearHistory() {
+      scanHistory = [];
+      localStorage.removeItem('hidden_osint_history_v1');
+      renderHistory();
+      showToast('info', 'History Cleared', 'Local scan audit log emptied.');
+    }
+
+    // ---------- Exports ----------
+    function exportCSV() {
+      if (!classifiedAssets.length) {
+        showToast('warning', 'Nothing to Export', 'No discovered subdomains available.');
+        return;
+      }
+      const headers = ['Subdomain', 'Classification', 'Risk Level', 'Sources'];
+      const rows = classifiedAssets.map(a => [
+        safeCsvCell(a.subdomain),
+        safeCsvCell(a.classification),
+        safeCsvCell(a.risk),
+        safeCsvCell(a.sources.join(' | '))
+      ].join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      downloadBlob(csv, 'text/csv;charset=utf-8;', `hidden_osint_${currentScan?.target || 'results'}.csv`);
+      showToast('success', 'CSV Exported', `${classifiedAssets.length} subdomains exported safely.`);
+    }
+
+    function exportJSON() {
+      if (!currentScan) {
+        showToast('warning', 'Nothing to Export', 'Run a scan first.');
+        return;
+      }
+      downloadBlob(JSON.stringify(currentScan, null, 2), 'application/json', `hidden_osint_${currentScan.target}.json`);
+      showToast('success', 'JSON Exported', `Full report saved for ${currentScan.target}.`);
+    }
+
+    function downloadBlob(content, mime, filename) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------- Init ----------
+    renderSourcesGrid([]);
+    renderHistory();
+  </script>
+</body>
+</html>
